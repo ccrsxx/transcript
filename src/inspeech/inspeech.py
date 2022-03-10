@@ -1,5 +1,11 @@
 import os
 import re
+import shutil
+import speech_recognition as sr
+import moviepy.editor as mp
+
+from pydub import AudioSegment
+from pydub.silence import split_on_silence
 
 
 def cls():
@@ -61,7 +67,9 @@ def get_url():
             msg = ''
 
         try:
-            url = input('Enter Youtube Video URL ex. https://www.youtube.com/watch?v=dQw4w9WgXcQ\n> ')
+            url = input(
+                'Enter Youtube Video URL ex. https://www.youtube.com/watch?v=dQw4w9WgXcQ\n> '
+            )
         except KeyboardInterrupt:
             print('\n\nUser intrerupted the program. Exiting...')
             exit()
@@ -112,12 +120,67 @@ def get_code(url: str) -> str:
     return choice
 
 
+def get_large_audio_transcription(path: str) -> str:
+    """
+    Splitting the large audio file into chunks
+    and apply speech recognition on each of these chunks
+    """
+
+    r = sr.Recognizer()
+
+    sound = AudioSegment.from_wav(path)
+    chunks = split_on_silence(
+        sound,
+        min_silence_len=500,
+        silence_thresh=sound.dBFS - 14,
+        keep_silence=500,
+    )
+
+    chunks_folder = "audio-chunks"
+
+    if not os.path.isdir(chunks_folder):
+        os.mkdir(chunks_folder)
+
+    full_text = ""
+
+    for i, audio_chunk in enumerate(chunks, start=1):
+        chunk_filename = os.path.join(chunks_folder, f"chunk{i}.wav")
+        audio_chunk.export(chunk_filename, format="wav")
+
+        with sr.AudioFile(chunk_filename) as source:
+            audio_listened = r.record(source)
+            try:
+                text = r.recognize_google(audio_listened)
+            except sr.UnknownValueError as e:
+                pass
+            else:
+                text = f"{text.capitalize()}. "
+                print(chunk_filename, ":", text)
+                full_text += text
+    shutil.rmtree('audio-chunks')
+
+    return full_text
+
+
 def main():
-    url = get_url()
+    # url = get_url()
 
-    choice = get_code(url)
+    # choice = get_code(url)
 
-    os.system(f'yt-dlp {f"-f {choice}" if choice else ""} {url}')
+    # os.system(f'yt-dlp {f"-f {choice}" if choice else ""} -o "dw_video.%(ext)s" {url}')
+
+    filename = [file for file in os.listdir() if file.startswith('dw_video.')][0]
+
+    print(filename)
+
+    clip = mp.VideoFileClip(filename)
+    clip.audio.write_audiofile(f'{filename}.wav')
+
+    text = get_large_audio_transcription(f'{filename}.wav')
+    text = text.replace('. ', '.\n')
+
+    with open('transcript.txt', 'w') as f:
+        f.write(text)
 
 
 if __name__ == '__main__':
