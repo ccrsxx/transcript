@@ -20,6 +20,7 @@ def check_yt_dlp():
             print(
                 'yt-dlp already downloaded. But not in PATH. Please add it to the PATH.'
             )
+            input()
             quit()
 
         print('yt-dlp not found. Downloading...')
@@ -32,6 +33,7 @@ def check_yt_dlp():
         )
 
         print('yt-dlp downloaded successfully. Now add it to your PATH variable.')
+        input()
         quit()
     else:
         print('yt-dlp found.')
