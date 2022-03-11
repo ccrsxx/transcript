@@ -4,6 +4,8 @@ import shutil
 import speech_recognition as sr
 import moviepy.editor as mp
 
+from datetime import datetime
+from googletrans import Translator
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 
@@ -12,13 +14,38 @@ def cls():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-def get_video(url):
+def check_yt_dlp():
+    if not shutil.which('yt-dlp'):
+        if os.path.exists('C:\\Softwares\\\yt-dlp\\yt-dlp.exe'):
+            print(
+                'yt-dlp already downloaded. But not in PATH. Please add it to the PATH.'
+            )
+            quit()
+
+        print('yt-dlp not found. Downloading...')
+
+        if not os.path.exists('C:\\Softwares\\yt-dlp'):
+            os.makedirs('C:\\Softwares\\yt-dlp')
+
+        os.system(
+            'curl -L https://yt-dl.org/downloads/latest/youtube-dl.exe -o C:\\Softwares\\yt-dlp\\yt-dlp.exe'
+        )
+
+        print('yt-dlp downloaded successfully. Now add it to your PATH variable.')
+        quit()
+    else:
+        print('yt-dlp found.')
+
+
+def get_video(url: str) -> 'tuple[list[str], str]':
     spacing = lambda x, y=20: y - len(x)
 
     video_properties = [['code', 'ext', 'type', 'quality', 'size']]
     codes = []
 
-    result = os.popen(f'yt-dlp -F {url} --compat-options list-formats').readlines()[4:]
+    result = os.popen(f'yt-dlp -F "{url}" --compat-options list-formats').readlines()[
+        4:
+    ]
 
     for prop in result:
         if 'mhtml' in prop:
@@ -74,7 +101,7 @@ def get_url():
             print('\n\nUser intrerupted the program. Exiting...')
             exit()
 
-        if not re.match('https://(www.)?youtube.com/watch\?v=.+', url):
+        if not re.match('https://(www.)?youtube.com/watch\?v=.+', url.strip()):
             msg = 'Invalid URL. Please try again.\n'
             url = ''
             continue
@@ -92,11 +119,10 @@ def get_code(url: str) -> str:
     while choice not in codes:
         cls()
 
+        print(result)
         if msg:
             print(msg)
             msg = ''
-
-        print(result)
 
         try:
             choice = input(
@@ -121,11 +147,6 @@ def get_code(url: str) -> str:
 
 
 def get_large_audio_transcription(path: str) -> str:
-    """
-    Splitting the large audio file into chunks
-    and apply speech recognition on each of these chunks
-    """
-
     r = sr.Recognizer()
 
     sound = AudioSegment.from_wav(path)
@@ -136,51 +157,130 @@ def get_large_audio_transcription(path: str) -> str:
         keep_silence=500,
     )
 
-    chunks_folder = "audio-chunks"
+    chunks_folder = "temp_chunks"
 
     if not os.path.isdir(chunks_folder):
         os.mkdir(chunks_folder)
 
-    full_text = ""
+    full_text = ''
 
-    for i, audio_chunk in enumerate(chunks, start=1):
-        chunk_filename = os.path.join(chunks_folder, f"chunk{i}.wav")
+    for i, audio_chunk in enumerate(chunks, 1):
+        chunk_filename = os.path.join(chunks_folder, f"chunk_{i}.wav")
         audio_chunk.export(chunk_filename, format="wav")
 
         with sr.AudioFile(chunk_filename) as source:
             audio_listened = r.record(source)
             try:
                 text = r.recognize_google(audio_listened)
-            except sr.UnknownValueError as e:
-                pass
+            except sr.UnknownValueError:
+                print(f"Could not understand audio. Skipping {chunk_filename}")
             else:
                 text = f"{text.capitalize()}. "
-                print(chunk_filename, ":", text)
+                print(f'{chunk_filename}: {text}')
                 full_text += text
-    shutil.rmtree('audio-chunks')
+
+    shutil.rmtree(chunks_folder)
+    os.remove('audio.wav')
 
     return full_text
 
 
+def normalize_transcript(
+    current: str = 'english_transcript.txt',
+    paragraph_break: int = 5,
+    line_break: int = 15,
+) -> None:
+    ALL_WORDS = []
+
+    paragraph = 1
+    counter = 1
+
+    with open(current, 'r+') as f:
+        for line in f:
+            line = line.split(' ')
+            ALL_WORDS.extend(line)
+
+        f.seek(0)
+        f.truncate()
+
+        for word in ALL_WORDS:
+            if counter == line_break:
+                f.write(word.strip('\n') + "\n")
+                paragraph += 1
+                counter = 0
+            else:
+                f.write(word.strip('\n') + " ")
+
+            if paragraph == paragraph_break + 1:
+                f.write("\n")
+                paragraph = 1
+
+            counter += 1
+
+
+def translate_transcript():
+    translator = Translator()
+
+    normalize_transcript()
+
+    with open('english_transcript.txt', 'r') as f, open(
+        'indonesian_transcript.txt', 'w'
+    ) as j:
+        raw = f.read()
+        translation = translator.translate(raw, src='en', dest='id')
+        j.write(translation.text)
+
+
 def main():
-    # url = get_url()
+    print('> Checking if yt-dlp is installed...\n')
 
-    # choice = get_code(url)
+    check_yt_dlp()
 
-    # os.system(f'yt-dlp {f"-f {choice}" if choice else ""} -o "dw_video.%(ext)s" {url}')
+    os.chdir(os.path.join(os.path.expanduser('~'), 'Downloads'))
 
-    filename = [file for file in os.listdir() if file.startswith('dw_video.')][0]
+    unique = datetime.now().strftime('%H%M%S')
 
-    print(filename)
+    url = get_url()
+    choice = get_code(url)
 
-    clip = mp.VideoFileClip(filename)
-    clip.audio.write_audiofile(f'{filename}.wav')
+    print('> Downloading the video...\n')
 
-    text = get_large_audio_transcription(f'{filename}.wav')
-    text = text.replace('. ', '.\n')
+    os.system(
+        f'yt-dlp {f"-f {choice}" if choice else ""} -o "{unique} - %(title)s.%(ext)s" {url}'
+    )
 
-    with open('transcript.txt', 'w') as f:
+    old_filename = [file for file in os.listdir() if file.startswith(f'{unique}')][0]
+    new_filename, ext = re.findall(r'\d+\s-\s(.+)(\..+)', old_filename)[0]
+
+    video_name = f'video{ext}'
+
+    if os.path.exists(new_filename):
+        shutil.rmtree(new_filename)
+
+    os.makedirs(new_filename)
+    shutil.move(old_filename, os.path.join(new_filename, video_name))
+
+    os.chdir(new_filename)
+
+    print('\n> Converting the video to audio...\n')
+
+    audio_clip = mp.VideoFileClip(video_name)
+    audio_clip.audio.write_audiofile(f'audio.wav')
+
+    print(
+        '\n> Transcribing the audio... This might take a while depending on how long the video!\n'
+    )
+
+    text = get_large_audio_transcription('audio.wav')
+
+    with open('english_transcript.txt', 'w') as f:
         f.write(text)
+
+    translate_transcript()
+
+    print(f'\n✅ Finished! Saved to {os.path.abspath(os.getcwd())}')
+
+    os.system('explorer .')
 
 
 if __name__ == '__main__':
