@@ -28,7 +28,7 @@ def check_yt_dlp():
             os.makedirs('C:\\Softwares\\yt-dlp')
 
         os.system(
-            'curl -L https://yt-dl.org/downloads/latest/youtube-dl.exe -o C:\\Softwares\\yt-dlp\\yt-dlp.exe'
+            'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o C:\\Softwares\\yt-dlp\\yt-dlp.exe'
         )
 
         print('yt-dlp downloaded successfully. Now add it to your PATH variable.')
@@ -227,8 +227,15 @@ def translate_transcript():
         'indonesian_transcript.txt', 'w'
     ) as j:
         raw = f.read()
-        translation = translator.translate(raw, src='en', dest='id')
-        j.write(translation.text)
+
+        if len(raw) > 5000:
+            for i in range(0, len(raw), 5000):
+                text = raw[i : i + 5000]
+                translation = translator.translate(text, src='en', dest='id')
+                j.write(translation.text)
+        else:
+            translation = translator.translate(raw, src='en', dest='id')
+            j.write(translation.text)
 
 
 def main():
@@ -281,6 +288,8 @@ def main():
     print(f'\n✅ Finished! Saved to {os.path.abspath(os.getcwd())}')
 
     os.system('explorer .')
+
+    input('\nPress enter to exit...')
 
 
 if __name__ == '__main__':
