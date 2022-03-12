@@ -16,14 +16,7 @@ def cls():
 
 def check_yt_dlp():
     if not shutil.which('yt-dlp'):
-        if os.path.exists('C:\\Softwares\\\yt-dlp\\yt-dlp.exe'):
-            print(
-                'yt-dlp already downloaded. But not in PATH. Please add it to the PATH.'
-            )
-            input()
-            quit()
-
-        print('yt-dlp not found. Downloading...')
+        print('> Downloading yt-dlp...\n')
 
         if not os.path.exists('C:\\Softwares\\yt-dlp'):
             os.makedirs('C:\\Softwares\\yt-dlp')
@@ -32,11 +25,16 @@ def check_yt_dlp():
             'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o C:\\Softwares\\yt-dlp\\yt-dlp.exe'
         )
 
-        print('yt-dlp downloaded successfully. Now add it to your PATH variable.')
-        input()
+        print('\n> yt-dlp downloaded successfully. Adding to the path....')
+
+        os.system(
+            """
+            for /f "skip=2 tokens=3*" %a in ('reg query HKCU\Environment /v PATH') do @if [%b]==[] ( @setx PATH "%~a;C:\\Softwares\\yt-dlp" ) else ( @setx PATH "%~a %~b;C:\\Softwares\\yt-dlp" )
+            """
+        )
+
+        input('\n> Path updated successfully. Please rerun the script.')
         quit()
-    else:
-        print('yt-dlp found.')
 
 
 def get_video(url: str) -> 'tuple[list[str], str]':
@@ -192,7 +190,7 @@ def normalize_transcript(
     paragraph_break: int = 5,
     line_break: int = 15,
 ) -> None:
-    ALL_WORDS = []
+    all_words = []
 
     paragraph = 1
     counter = 1
@@ -200,12 +198,12 @@ def normalize_transcript(
     with open(current, 'r+') as f:
         for line in f:
             line = line.split(' ')
-            ALL_WORDS.extend(line)
+            all_words.extend(line)
 
         f.seek(0)
         f.truncate()
 
-        for word in ALL_WORDS:
+        for word in all_words:
             if counter == line_break:
                 f.write(word.strip('\n') + "\n")
                 paragraph += 1
@@ -241,8 +239,6 @@ def translate_transcript():
 
 
 def main():
-    print('> Checking if yt-dlp is installed...\n')
-
     check_yt_dlp()
 
     os.chdir(os.path.join(os.path.expanduser('~'), 'Downloads'))
@@ -287,11 +283,11 @@ def main():
 
     translate_transcript()
 
-    print(f'\n✅ Finished! Saved to {os.path.abspath(os.getcwd())}')
+    print(f'\n> ✅ Finished! Saved to {os.path.abspath(os.getcwd())}')
 
     os.system('explorer .')
 
-    input('\nPress enter to exit...')
+    input('\n> Press enter to exit...')
 
 
 if __name__ == '__main__':
